@@ -5,7 +5,7 @@
     - role: Ansible-firewalld
   vars:
     set_name: bots
-    set_name_list: serbianbots
+    set_name_list: bots
     fw_services:
      ssh:
           state: enabled
@@ -51,7 +51,7 @@
         - inet: ipv6
           chain: input
           priority: 1
-          match_set: serbianbots
+          match_set: bots
           direction: src
           target: DROP
         - match_set: hellokitty

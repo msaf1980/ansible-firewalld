@@ -1,0 +1,4 @@
+# Debian
+dependencies_firewalld:
+  - firewalld
+  - ipset

@@ -39,7 +39,7 @@ fw_port:
     protocol: udp
     zone: internal
 #family is default to ipv4
-fw_richrule:
+fw_richrules_direct:
   - source: "192.168.0.0/24"
     service: "http"
     log_prefix: "rmtcmd"
@@ -48,7 +48,7 @@ fw_richrule:
     limit: "1/m"
     
 #define an extended rich rule with a specific port or protocol
-rich_rules:
+fw_richrules_direct:
   - rich_rule: 'rule family="ipv4" source address="192.168.2.4" drop'
     state: enabled
     permanent: true
@@ -91,7 +91,7 @@ which can be import into the ipset
 defaults are inet:ipv4,priority:0,chain:Output,target:DSCP; only requires "dscp\_hex or dscp\_class" to be defined. 
 dscp_hex will take integers or hex
 ```
-    direct_dscp:
+    fw_direct_dscp:
         - dscp_class: "CS2"
           priority: 1
         - dscp_hex: "0x14"
@@ -104,11 +104,11 @@ dscp_hex will take integers or hex
 mandatory field here is `match_set`
 ####ipset addon
 ```
-  direct_rule:
+  fw_direct_rule:
         - inet: ipv6
           chain: input
           priority: 1
-          match_set: serbianbots
+          match_set: bots
           direction: src
 ```
 

@@ -1,0 +1,4 @@
+# Set defaults for Debian
+---
+
+- include_vars: "{{ ansible_os_family }}.yml"

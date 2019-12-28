@@ -1,0 +1,5 @@
+# Red Hat generic vars
+dependencies_firewalld:
+  - firewalld
+  - ipset
+  - python-firewall

@@ -1,0 +1,4 @@
+# RedHat 8, Fedora 30
+dependencies_firewalld:
+  - firewalld
+  - python3-firewall

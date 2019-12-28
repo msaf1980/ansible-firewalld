@@ -43,10 +43,10 @@
           route: src
           port:
           filter: INPUT
-          ipset: serbianbots
+          ipset: bots
           rule: DROP
 
     rich_rules:
-        - rich_rule: 'rule family="ipv4" source ipset="serbianbots" drop'
+        - rich_rule: 'rule family="ipv4" source ipset="bots" drop'
           state: enabled
           permanent: true
