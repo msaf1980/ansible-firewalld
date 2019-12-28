@@ -13,25 +13,40 @@
   notify:
     - firewalld restart
   when: firewalld_backend is defined
+
+- name: Firewalld | Enable logging
+  lineinfile:
+    path: '/etc/sysconfig/firewalld'
+    regexp: "^FIREWALLD_ARGS="
+    line: "FIREWALLD_ARGS='--debug'"
+    state: present
+  when: ansible_os_family | lower in ["redhat", "fedora"]
+  notify: firewalld restart
+
+- name: Firewalld | Start firewalld
+  service: name=firewalld state=started enabled=yes
+
+- name: Manage firewalld ipsets
+  block:
+    - name: Configure firewalld ipsets
+      template:
+        src: ipset_template.xml.j2
+        dest: /etc/firewalld/ipsets/{{ item.name }}.xml
+      with_items: "{{ fw_ipsets | default([]) }}"
+      when: item.state | default('enabled') in ('enabled', 'present')
+      notify: firewalld reload
   tags:
     - base
     - security
     - firewall
 
-- name: Firewalld | Enable logging
-  lineinfile: dest=/etc/sysconfig/firewalld regexp="^FIRE" line="FIREWALLD_ARGS='--debug'" state=present
-
-- name: Firewalld | Start firewalld
-  service: name=firewalld state=started enabled=yes
-
 - name: Firewalld | Create zones
   firewalld:
-    zone: "{{ item }}"
-    permanent: true
-    state: enabled
-  with_items: "{{ fw_zones }}"
-  notify:
-    - firewalld restart
+    zone: "{{ item.zone }}"
+    permanent: yes
+    state: "{{ item.state if item.state is defined else 'enabled' }}"
+  with_items: "{{ fw_zones | default([]) }}"
+  notify: firewalld restart
   tags:
     - base
     - security
@@ -42,10 +57,10 @@
     zone: "{{ item.zone }}"
     interface: "{{ item.interface }}"
     permanent: yes
-    state: enabled
-  with_items: "{{ fw_interface_zones | default({}) }}"
+    state: "{{ item.state if item.state is defined else 'enabled' }}"
+  with_items: "{{ fw_interface_zones | default([]) }}"
   notify:
-    - firewalld restart
+    - firewalld reload
   tags:
     - base
     - security
@@ -71,56 +86,73 @@
 
 - name: Firewalld | Add services
   firewalld:
-    service: "{{ item.key }}"
-    permanent: yes
-    state: "{{ item.state if item.state is defined else 'enabled' }}"
-    zone: "{{ item.value.zone if item.value.zone is defined else fw_zone_default }}"
-  with_dict: "{{ fw_services | default({}) }}"
-  notify: firewalld reload
-
-- name: Firewalld | Add custom port
-  firewalld:
-    port: "{{ item.key }}/{{ item.value.protocol }}"
-    permanent: yes
-    state: "{{ item.state if item.state is defined else 'enabled' }}"
-    zone: "{{ item.value.zone if item.value.zone is defined else fw_zone_default }}"
-  with_dict: "{{ fw_ports | default({}) }}"
-  notify: firewalld reload
-
-#update to adjust for duplicate ports
-- name: Firewalld | Add duplicate port with different protocol
-  firewalld:
-    port: "{{ item.port }}/{{ item.protocol }}"
+    service: "{{ item.service }}"
     permanent: yes
     state: "{{ item.state if item.state is defined else 'enabled' }}"
     zone: "{{ item.zone if item.zone is defined else fw_zone_default }}"
-  with_items: "{{ fw_ports | default({}) }}"
+  with_items: "{{ fw_services | default([]) }}"
   notify: firewalld reload
+  tags:
+    - base
+    - security
+    - firewall
+
+- name: Firewalld | Add ports
+  firewalld:
+    port: "{{ item.port }}"
+    permanent: yes
+    state: "{{ item.state if item.state is defined else 'enabled' }}"
+    zone: "{{ item.zone if item.zone is defined else fw_zone_default }}"
+  with_items: "{{ fw_ports | default([]) }}"
+  notify: firewalld reload
+  tags:
+    - base
+    - security
+    - firewall
 
 - name: Firewalld | Add rich_rules
   firewalld:
     rich_rule: 'rule {% if item.source is defined %} family={{item.family | default("ipv4") }} source address={{ item.source }} {% endif %} service name="{{ item.service }}" {% if item.log_prefix is defined %} log prefix="{{ item.log_prefix }}" level="{{ item.level}}" limit value="{{item.limit | default("4/m") }}"{% endif %} {{item.rule}} '
     permanent: yes
     state: "{{ item.state if item.state is defined else 'enabled' }}"
-  with_items: "{{ fw_richrules | default({}) }}"
+  with_items: "{{ fw_richrules | default([]) }}"
   notify: firewalld reload
+  tags:
+    - base
+    - security
+    - firewall
 
 - name: Firewalld | Add fancy rich_rules
   firewalld:
     rich_rule: "{{item.rich_rule}}"
     permanent: yes
     state: "{{ item.state if item.state is defined else 'enabled' }}"
-  with_items: "{{ fw_richrules_direct | default({}) }}"
+  with_items: "{{ fw_richrules_direct | default([]) }}"
   notify: firewalld reload
+  tags:
+    - base
+    - security
+    - firewall
 
 #- name: Firewalld | Add direct DSCP Markings
 #  command: |
 #   firewall-cmd --permanent --direct --add-rule {{item.inet | default("ipv4") }} mangle {{ item.chain | default("OUTPUT") }} {{ item.priority | default("0") }} -j {{ item.target | default("DSCP") }} {% if item.dscp_hex is defined %} --set-dscp {{ item.dscp_hex }} {% else %} --set-dscp-class {{ item.dscp_class }}  {% endif %} {% if item.destination is defined %} -d {{ item.destination }} {% endif %}
-#  with_items: "{{ direct_dscp | default({}) }}"
+#  with_items: "{{ direct_dscp | default([]) }}"
 #  notify: firewalld reload
 
 #- name: Firewalld | Add direct iptable rule with created ipset group
 #  command: |
 #   firewall-cmd --permanent --direct --add-rule {{ item.inet | default("ipv4") }} filter {{ item.chain.upper() | default("INPUT") }} {{ item.priority | default("0") }} -m set --match-set {{ item.match_set }} {{item.direction}} -j {{ item.target | default("drop") }}
-#  with_items: "{{ direct_rule | default({}) }}"
+#  with_items: "{{ direct_rule | default([]) }}"
 #  notify: firewalld reload
+
+- name: Firewalld | Remove ipset groups
+  command: |
+   firewall-cmd --permanent --delete-ipset={{ item.name }}
+  with_items: "{{ fw_ipsets | default([]) }}"
+  when: item.state | default('enabled') in ('absent', 'disabled')
+  notify: firewalld reload
+  tags:
+    - base
+    - security
+    - firewall

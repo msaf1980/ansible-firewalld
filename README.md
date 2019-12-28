@@ -16,27 +16,48 @@ Role Variables
 --------------
 ```
 set_name:
-set_name_list: serbianbots
+set_name_list: bots
 ```
 ```
-default_zone:
+fw_default_zone: ..
 
-fw_service:
-   ssh: 
+```
+```
+fw_ipsets:
+  - name: "whilelist"
+    type: "ip"
+    description: "White List"
+    option:
+      name: value
+    entry: []
+```
+```
+
+Use `firewall-cmd --get-ipset-types` to get a list of supported types.
+
+Supported Options:
+
+Name | Value
+-----|------
+family | "int", "inet6"
+timeout | integer
+hashsize | integer
+maxelem: | integer
+
+```
+fw_zones:
+  - zone: "libvirt"
+fw_interface_zones:
+  - zone: "private"
+    interface: 'bond3'
+    state: absent
+fw_services:
+  - service: ssh
     state: enabled
-
 fw_ports:
-  8301:
-    protocol: tcp
-  5061:
-    protocol: udp
-#use {fw_port} when defining the same port for different protocols
-fw_port:
-  - port: 3000
-    protocol: tcp
+  - port: "3000/tcp"
     state: enabled
-  - port: 3000
-    protocol: udp
+  - port: "3000/udp"
     zone: internal
 #family is default to ipv4
 fw_richrules_direct:
@@ -46,12 +67,11 @@ fw_richrules_direct:
     level: "info"
     rule: "reject"
     limit: "1/m"
-    
+
 #define an extended rich rule with a specific port or protocol
 fw_richrules_direct:
   - rich_rule: 'rule family="ipv4" source address="192.168.2.4" drop'
     state: enabled
-    permanent: true
 ```
 
 Dependencies
@@ -68,14 +88,13 @@ Flags for permanent can be added with the 'persist' flag if not included it is p
       roles:
          -  role: ansible-firewalld,
 		   fw_services:
-			https:
-			  persist: true 
-		        mysql:
-			  zone: internal
+		      - service: https
+		      - service: mysql
+			zone: internal
 		   fw_port:
                       - port: 8445
                         state: enabled
-                        default_zone: app_vpn
+                        zone: app_vpn
 ```
 
 To define a rich rule, use the 'rule' flag fw\_richrule for preset service rules and rich\_rules for custom rules . additional tips here [rich_rules](https://fedoraproject.org/wiki/Features/FirewalldRichLanguage)
